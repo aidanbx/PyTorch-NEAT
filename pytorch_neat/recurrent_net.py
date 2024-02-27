@@ -102,7 +102,7 @@ class RecurrentNet():
         returns: (batch_size, n_outputs)
         '''
         with torch.no_grad():
-            inputs = torch.tensor(inputs, dtype=self.dtype, device=self.device)
+            # inputs = torch.tensor(inputs, dtype=self.dtype, device=self.device)
             activs_for_output = self.activs
             if self.n_hidden > 0:
                 for _ in range(self.n_internal_steps):
