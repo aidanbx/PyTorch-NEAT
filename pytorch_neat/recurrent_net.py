@@ -57,6 +57,7 @@ class RecurrentNet():
         self.n_internal_steps = n_internal_steps
         self.dtype = dtype
         self.device = device
+        self.batch_size = batch_size
 
         self.n_inputs = n_inputs
         self.n_hidden = n_hidden

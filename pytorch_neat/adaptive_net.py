@@ -36,7 +36,7 @@ class AdaptiveNet:
                  activation=tanh_activation,
 
                  batch_size=1,
-                 device='cuda:0'):
+                 device='mps'):
 
         self.w_ih_node = w_ih_node
 
@@ -108,7 +108,7 @@ class AdaptiveNet:
                 self.hidden_coords, self.output_coords, self.w_ho_node)
 
             self.hidden = torch.zeros((self.batch_size, self.n_hidden, 1),
-                                      dtype=torch.float32)
+                                      dtype=torch.float32, device=self.device)
 
             self.batched_hidden_coords = get_coord_inputs(
                 self.hidden_coords, self.hidden_coords, batch_size=self.batch_size)
@@ -139,7 +139,7 @@ class AdaptiveNet:
 
             (x_out, y_out), (x_in, y_in) = self.batched_hidden_coords
 
-            self.hidden_to_hidden += self.delta_w_node(
+            self.hidden_to_hidden = self.hidden_to_hidden + self.delta_w_node(
                 x_out=x_out, y_out=y_out, x_in=x_in, y_in=y_in,
                 pre=hidden_inputs, post=hidden_outputs,
                 w=self.hidden_to_hidden)
@@ -158,12 +158,13 @@ class AdaptiveNet:
                weight_threshold=0.2,
                activation=tanh_activation,
                batch_size=1,
-               device='cuda:0'):
+               device='mps'):
 
         nodes = create_cppn(
             genome, config,
             ['x_in', 'y_in', 'x_out', 'y_out', 'pre', 'post', 'w'],
-            ['w_ih', 'b_h', 'w_hh', 'b_o', 'w_ho', 'delta_w'])
+            ['w_ih', 'b_h', 'w_hh', 'b_o', 'w_ho', 'delta_w'],
+            device=device)
 
         w_ih_node = nodes[0]
         b_h_node = nodes[1]

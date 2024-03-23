@@ -29,16 +29,19 @@ class AdaptiveLinearNet:
         activation=tanh_activation,
         cppn_activation=identity_activation,
         batch_size=1,
-        device="cuda:0",
+        device="mps",
     ):
 
         self.delta_w_node = delta_w_node
 
         self.n_inputs = len(input_coords)
-        self.input_coords = torch.tensor(
-            input_coords, dtype=torch.float32, device=device
-        )
-
+        if not isinstance(input_coords, torch.Tensor):
+            self.input_coords = torch.tensor(
+                input_coords, dtype=torch.float32, device=device
+            )
+        else:
+            self.input_coords = input_coords.to(device=device)
+            
         self.n_outputs = len(output_coords)
         self.output_coords = torch.tensor(
             output_coords, dtype=torch.float32, device=device
@@ -79,13 +82,11 @@ class AdaptiveLinearNet:
 
     def reset(self):
         with torch.no_grad():
-            self.input_to_output = (
-                self.get_init_weights(
+            self.input_to_output = (self.get_init_weights(
                     self.input_coords, self.output_coords, self.delta_w_node
-                )
-                .unsqueeze(0)
-                .expand(self.batch_size, self.n_outputs, self.n_inputs)
-            )
+                ).unsqueeze(0))
+            self.input_to_output += torch.randn_like(self.input_to_output) * 0.01
+            self.input_to_output = self.input_to_output.expand(self.batch_size, self.n_outputs, self.n_inputs)
 
             self.w_expressed = self.input_to_output != 0
 
@@ -100,9 +101,12 @@ class AdaptiveLinearNet:
         returns: (batch_size, n_outputs)
         """
         with torch.no_grad():
-            inputs = torch.tensor(
-                inputs, dtype=torch.float32, device=self.device
-            ).unsqueeze(2)
+            if not isinstance(inputs, torch.Tensor):
+                inputs = torch.tensor(
+                    inputs, dtype=torch.float32, device=self.device
+                ).unsqueeze(2)
+            else:
+                inputs = inputs.unsqueeze(2).to(device=self.device)
 
             outputs = self.activation(self.input_to_output.matmul(inputs))
 
@@ -157,6 +161,7 @@ class AdaptiveLinearNet:
             ["x_in", "y_in", "x_out", "y_out", "pre", "post", "w"],
             ["delta_w"],
             output_activation=output_activation,
+            device=device
         )
 
         delta_w_node = nodes[0]

@@ -31,9 +31,10 @@ batch_size = 4
 DEBUG = True
 
 
-def make_net(genome, config, _batch_size):
-    input_coords = [[-1.0, 0.0], [0.0, 0.0], [1.0, 0.0], [0.0, -1.0]]
+def make_net(genome, config, batch_size):
+    input_coords = [[-1.0, 0.0, 0.0], [0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, -1.0, 0.0]]
     output_coords = [[-1.0, 0.0], [0.0, 0.0], [1.0, 0.0]]
+    
     return AdaptiveLinearNet.create(
         genome,
         config,

@@ -30,6 +30,7 @@ class Node:
         aggregation,
         name=None,
         leaves=None,
+        device='cuda:0'
     ):
         """
         children: list of Nodes
@@ -56,6 +57,7 @@ class Node:
         self.leaves = leaves
         self.activs = None
         self.is_reset = None
+        self.device = device
 
     def __repr__(self):
         header = "Node({}, response={}, bias={}, activation={}, aggregation={})".format(
@@ -77,7 +79,7 @@ class Node:
         xs: list of torch tensors
         """
         if not xs:
-            return torch.full(shape, self.bias)
+            return torch.full(shape, self.bias, device=self.device)
         inputs = [w * x for w, x in zip(self.weights, xs)]
         try:
             pre_activs = self.aggregation(inputs)
@@ -165,7 +167,7 @@ class Leaf:
         self._reset()
 
 
-def create_cppn(genome, config, leaf_names, node_names, output_activation=None):
+def create_cppn(genome, config, leaf_names, node_names, output_activation=None, device='mps'):
 
     genome_config = config.genome_config
     required = required_for_output(
@@ -218,6 +220,7 @@ def create_cppn(genome, config, leaf_names, node_names, output_activation=None):
             activation,
             aggregation,
             leaves=leaves,
+            device=device
         )
         return nodes[idx]
 
@@ -238,6 +241,7 @@ def create_cppn(genome, config, leaf_names, node_names, output_activation=None):
 def clamp_weights_(weights, weight_threshold=0.2, weight_max=3.0):
     # TODO: also try LEO
     low_idxs = weights.abs() < weight_threshold
+    weights = weights.clone()
     weights[low_idxs] = 0
     weights[weights > 0] -= weight_threshold
     weights[weights < 0] += weight_threshold
@@ -248,19 +252,31 @@ def clamp_weights_(weights, weight_threshold=0.2, weight_max=3.0):
 def get_coord_inputs(in_coords, out_coords, batch_size=None):
     n_in = len(in_coords)
     n_out = len(out_coords)
+    coord_dim = in_coords.size(-1)  # Assuming in_coords and out_coords have the same last dimension size
 
     if batch_size is not None:
-        in_coords = in_coords.unsqueeze(0).expand(batch_size, n_in, 2)
-        out_coords = out_coords.unsqueeze(0).expand(batch_size, n_out, 2)
+        in_coords = in_coords.unsqueeze(0).expand(batch_size, n_in, coord_dim)
+        out_coords = out_coords.unsqueeze(0).expand(batch_size, n_out, coord_dim)
 
         x_out = out_coords[:, :, 0].unsqueeze(2).expand(batch_size, n_out, n_in)
         y_out = out_coords[:, :, 1].unsqueeze(2).expand(batch_size, n_out, n_in)
         x_in = in_coords[:, :, 0].unsqueeze(1).expand(batch_size, n_out, n_in)
         y_in = in_coords[:, :, 1].unsqueeze(1).expand(batch_size, n_out, n_in)
+        
+        if coord_dim == 3:
+            z_out = out_coords[:, :, 2].unsqueeze(2).expand(batch_size, n_out, n_in)
+            z_in = in_coords[:, :, 2].unsqueeze(1).expand(batch_size, n_out, n_in)
     else:
         x_out = out_coords[:, 0].unsqueeze(1).expand(n_out, n_in)
         y_out = out_coords[:, 1].unsqueeze(1).expand(n_out, n_in)
         x_in = in_coords[:, 0].unsqueeze(0).expand(n_out, n_in)
         y_in = in_coords[:, 1].unsqueeze(0).expand(n_out, n_in)
 
-    return (x_out, y_out), (x_in, y_in)
+        if coord_dim == 3:
+            z_out = out_coords[:, 2].unsqueeze(1).expand(n_out, n_in)
+            z_in = in_coords[:, 2].unsqueeze(0).expand(n_out, n_in)
+    
+    if coord_dim == 3:
+        return (x_out, y_out, z_out), (x_in, y_in, z_in)
+    else:
+        return (x_out, y_out), (x_in, y_in)
